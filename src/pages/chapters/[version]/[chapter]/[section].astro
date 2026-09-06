@@ -8,6 +8,7 @@ import { Icon } from 'astro-icon/components'
 import { getTextbooks } from "@/lib/textbooks";
 import { siteConfig } from "@/config/site";
 import { sectionOgImageUrl } from "@/lib/og";
+import ch1Timing from '@/data/ch1-timing';
 
 interface Props {
     version: string
@@ -44,6 +45,7 @@ export async function getStaticPaths() {
 }
 
 const { version, section, chapter, textbook } = Astro.props;
+const sectionTiming = chapter.number === 1 ? (ch1Timing[section.number] ?? null) : null;
 
 let pageDescription = section.number === 1 ? chapter.meta.description : section.description
 
@@ -116,7 +118,7 @@ const paper = resolveResource(chapter.meta.paper);
                 </li>
             </ul>
             {(() => {
-                const hasAudio = !!section.audioLink;
+                const hasAudio = !!(section.audioLink || sectionTiming);
                 const isFirstSection = section.number === 1;
 
                 const hasVideo = isFirstSection && lecture;
@@ -274,7 +276,7 @@ const paper = resolveResource(chapter.meta.paper);
         </div>
     </div>
 
-    <article class="prose prose-a:text-brand-600 lg:prose-lg prose-figure:first:mt-0!">
+    <article class="prose prose-a:text-brand-600 lg:prose-lg prose-figure:first:mt-0!" data-chapter-article>
         {section.nodes.map(node => <NodeRenderer node={node} />)}
 
         {section.footnotes && section.footnotes.length > 0 && (
@@ -337,9 +339,10 @@ const paper = resolveResource(chapter.meta.paper);
         </nav>
     </article>
 
-    {section.audioLink && (
+    {(section.audioLink || sectionTiming) && (
     <div id="audio-page-data" class="hidden"
-        data-audio-url={section.audioLink}
+        data-audio-url={sectionTiming ? sectionTiming.audioUrl : (section.audioLink ?? '')}
+        data-words-url={sectionTiming?.wordsUrl ?? ''}
         data-section-title={`${chapter.number}.${section.number} ${section.title}`}
         data-chapter-title={chapter.title}
         data-chapter-number={String(chapter.number)}
