@@ -8,7 +8,7 @@ import { Icon } from 'astro-icon/components'
 import { getTextbooks } from "@/lib/textbooks";
 import { siteConfig } from "@/config/site";
 import { sectionOgImageUrl } from "@/lib/og";
-import { resolveSectionAudio } from '@/lib/section-audio';
+import { availableAudioSources, resolveSectionAudio } from '@/lib/section-audio';
 
 interface Props {
     version: string
@@ -47,6 +47,22 @@ export async function getStaticPaths() {
 const { version, section, chapter, textbook } = Astro.props;
 const sectionAudio = resolveSectionAudio(chapter.number, section.number, section.audioLink);
 
+// Dev only: a switch that forces one audio source, so all three states can be
+// looked at on one machine. Prerendered routes see neither query string nor
+// request headers, so the page hands the client every candidate URL and
+// src/lib/audio-source-switch.ts applies the choice on load.
+const audioSources = import.meta.env.DEV
+    ? availableAudioSources(chapter.number, section.number, section.audioLink)
+    : null;
+const audioSourceOptions = audioSources ? [
+    { value: 'auto', available: true, hint: 'Whatever this build can serve, preferring the staged constant-bitrate file.' },
+    { value: 'cbr', available: audioSources.cbr, hint: 'The locally staged constant-bitrate file. Seeking lands exactly on the word, so this is the source to prefer. Stage it with scripts/copy-ch1-audio.sh.' },
+    { value: 'cdn', available: audioSources.cdn, hint: 'The published file. Same narration, so the read-along still tracks, but it is variable bitrate and a seek only lands nearby.' },
+    { value: 'none', available: true, hint: 'Pretend the section has no audio, to check the page degrades to the no-player state.' },
+] : [];
+const cbrUrl = audioSources?.cbr ? resolveSectionAudio(chapter.number, section.number, section.audioLink, { override: 'cbr' })?.audioUrl : undefined;
+const cdnUrl = audioSources?.cdn ? resolveSectionAudio(chapter.number, section.number, section.audioLink, { override: 'cdn' })?.audioUrl : undefined;
+
 let pageDescription = section.number === 1 ? chapter.meta.description : section.description
 
 const ogImage = sectionOgImageUrl({
@@ -80,11 +96,11 @@ const lecture = resolveResource(chapter.meta.lecture);
 const paper = resolveResource(chapter.meta.paper);
 ---
 <Fragment set:html={`<!--
-    AI Safety Atlas â€” the open textbook for AI Safety
+    AI Safety Atlas — the open textbook for AI Safety
     Published by the French Center for AI Safety (CeSIA)
     https://ai-safety-atlas.com
 
-    This page: Chapter ${chapter.number}, Section ${section.number} â€” ${section.title}
+    This page: Chapter ${chapter.number}, Section ${section.number} — ${section.title}
     Authors: ${chapter.meta.authors.map(a => a.name).join(', ')}
     Version: ${version}
 
@@ -149,6 +165,23 @@ const paper = resolveResource(chapter.meta.paper);
 
                         {/* Audio panel */}
                         <div role="tabpanel" id="panel-audio" aria-labelledby="tab-audio" class="media-panel" data-panel="audio">
+                            {audioSourceOptions.length > 0 && (
+                            <div class="mb-3 flex items-center gap-1 text-[11px] text-gray-400" role="group" aria-label="Audio source (development only)" data-audio-source-switch>
+                                <span class="mr-1">source: <span data-audio-source-label>{sectionAudio ? sectionAudio.source : 'none'}</span></span>
+                                {audioSourceOptions.map(option => (
+                                    <button
+                                        type="button"
+                                        data-audio-source-option={option.value}
+                                        title={`${option.hint}${option.available ? '' : ' Not available in this build.'} Development-only switch; reloads the page.`}
+                                        class:list={[
+                                            'cursor-pointer rounded border border-transparent px-1.5 py-0.5 transition-colors hover:border-gray-200 hover:text-gray-500',
+                                            'aria-[current=true]:border-gray-300 aria-[current=true]:bg-gray-50 aria-[current=true]:text-gray-600',
+                                            !option.available && 'line-through',
+                                        ]}
+                                    >{option.value}</button>
+                                ))}
+                            </div>
+                            )}
                             {hasAudio ? (
                             <div id="inline-audio-player" class="space-y-3">
                                 <p id="inline-track-title" class="text-sm font-medium text-gray-900 truncate">{chapter.number}.{section.number} {section.title}</p>
@@ -344,6 +377,9 @@ const paper = resolveResource(chapter.meta.paper);
     <div id="audio-page-data" class="hidden"
         data-audio-url={sectionAudio.audioUrl}
         data-words-url={sectionAudio.wordsUrl ?? ''}
+        data-audio-source={sectionAudio.source}
+        data-audio-url-cbr={cbrUrl}
+        data-audio-url-cdn={cdnUrl}
         data-section-title={`${chapter.number}.${section.number} ${section.title}`}
         data-chapter-title={chapter.title}
         data-chapter-number={String(chapter.number)}

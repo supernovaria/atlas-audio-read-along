@@ -47,6 +47,8 @@ Chapter 1 ships word-level timings (`public/audio/ch1/*.words.json`) so the narr
 
 So a plain clone still gets the read-along, streamed from the published audio; staging the local files is only needed for exact seeking, which is what work on click-a-word-to-seek wants. Staging needs the podcast pipeline's `output/capabilities` directory -- point the script at it with `ATLAS_AUDIO_SRC` if it is not next to this repo. Sections with neither source render no player at all.
 
+`pnpm dev` adds a small switch above the player (`source: cbr | auto cbr cdn none`) that forces a source and reloads, including `none` for checking that the page degrades without a player. It exists only in dev builds.
+
 ## Environment variables
 
 All env vars are optional. Copy `.env.example` to `.env` and fill in only the ones you need.
