@@ -53,7 +53,7 @@ To stage them:
 scripts/copy-ch1-audio.sh --fetch
 ```
 
-That downloads the published audio and re-encodes it, and needs only `curl` and `ffmpeg`. Without `--fetch` the script copies from the podcast pipeline's `output/capabilities` directory instead, if you have one -- point it elsewhere with `ATLAS_AUDIO_SRC`. Both routes produce the same audio.
+That downloads the published audio and re-encodes it, and needs only `curl` and `ffmpeg`. All 11 sections are ~107 MB and take about a minute; name the ones you want to skip the wait -- `scripts/copy-ch1-audio.sh --fetch 1` stages section 1.1 in a couple of seconds, which is enough to compare seeking between the two sources. Without `--fetch` the script copies from the podcast pipeline's `output/capabilities` directory instead, if you have one -- point it elsewhere with `ATLAS_AUDIO_SRC`. Both routes produce the same audio.
 
 `pnpm dev` adds a small switch above the player (`source: cbr | auto cbr cdn none`) that forces a source and reloads, including `none` for checking that the page degrades without a player. It exists only in dev builds.
 

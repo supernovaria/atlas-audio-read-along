@@ -21,8 +21,13 @@
 # committed set the alignment was tuned and measured against. Refresh timings
 # only on purpose, never as a side effect of staging audio.
 #
+# Chapter 1 is 11 sections and about 107 MB to fetch, a bit over a minute on a
+# normal connection. Name the sections you actually want to save the wait --
+# one is enough to compare seeking between the two sources.
+#
 #   ATLAS_AUDIO_SRC=/path/to/output/capabilities   use a pipeline output here
 #   --fetch                                        skip it and download instead
+#   copy-ch1-audio.sh --fetch 1 2                  just sections 1.1 and 1.2
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -32,7 +37,21 @@ SRC="${ATLAS_AUDIO_SRC:-$(cd "$ROOT/.." && pwd)/atlas-podcast/output/capabilitie
 SECTIONS=11
 
 fetch_only=false
-[ "${1:-}" = "--fetch" ] && fetch_only=true
+wanted=()
+for arg in "$@"; do
+  case "$arg" in
+    --fetch) fetch_only=true ;;
+    ''|*[!0-9]*) echo "ERROR: unrecognised argument: $arg" >&2; exit 1 ;;
+    *)
+      if [ "$arg" -lt 1 ] || [ "$arg" -gt "$SECTIONS" ]; then
+        echo "ERROR: chapter 1 has sections 1 to $SECTIONS, not $arg" >&2
+        exit 1
+      fi
+      wanted+=("$arg")
+      ;;
+  esac
+done
+[ ${#wanted[@]} -eq 0 ] && wanted=($(seq 1 $SECTIONS))
 
 need() {
   command -v "$1" >/dev/null 2>&1 || { echo "ERROR: $1 is required but not installed." >&2; exit 1; }
@@ -42,7 +61,7 @@ mkdir -p "$DEST"
 
 if [ "$fetch_only" = false ] && [ -d "$SRC" ]; then
   echo "Staging from the pipeline output: $SRC"
-  for i in $(seq 1 $SECTIONS); do
+  for i in "${wanted[@]}"; do
     # Newer pipeline runs append a content hash (…_cbr.<hash>.mp3) for cache
     # busting; older ones don't. Prefer the newest match so a re-render wins,
     # and fail loudly rather than silently copying a stale file.
@@ -62,11 +81,11 @@ fi
 need curl
 need ffmpeg
 
-echo "Downloading the published audio and re-encoding to CBR."
+echo "Downloading the published audio and re-encoding to CBR (${#wanted[@]} of $SECTIONS sections)."
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-for i in $(seq 1 $SECTIONS); do
+for i in "${wanted[@]}"; do
   # The published URL for each section is pinned in the timing table; it
   # embeds the section number, so no parsing of the file's structure is
   # needed to pick the right one out.
