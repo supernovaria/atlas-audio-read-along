@@ -227,3 +227,101 @@ function fillWrittenGaps(writtenToSpoken: Int32Array): void {
     else writtenToSpoken[i] = carry
   }
 }
+
+/**
+ * Shortest run of narration-only words treated as an announcement rather than
+ * an ordinary gap in the alignment.
+ */
+const MIN_ANNOUNCEMENT_WORDS = 4
+
+/** Caption openers worth marking: the "Figure 1.2" the narration says. */
+const FIGURE_LABEL_WORDS = new Set(["figure", "fig", "table", "chart", "video"])
+
+export type ParkResult = {
+  /** Where each spoken word highlights, with announcements moved onto captions. */
+  spokenToWritten: Int32Array
+  /** Last written word of each highlight, so a caption label marks as a whole. */
+  parkEnd: Int32Array
+}
+
+/**
+ * How far a caption's own label runs -- the "Figure 1.2" that opens it.
+ *
+ * The narration says both words, so highlighting only "Figure" marks less
+ * than was actually spoken. Stops at the caption's own words, and at the
+ * first token with no digit in it, so an ordinary caption sentence is not
+ * swallowed.
+ */
+function captionLabelEnd(
+  words: string[],
+  captionId: Int32Array,
+  start: number,
+): number {
+  const first = words[start]?.toLowerCase().replace(/[^a-z]/g, "") ?? ""
+  if (!FIGURE_LABEL_WORDS.has(first)) return start
+  let end = start
+  for (let i = start + 1; i < words.length && i <= start + 2; i++) {
+    if (captionId[i] !== captionId[start]) break
+    if (!/\d/.test(words[i] ?? "")) break
+    end = i
+  }
+  return end
+}
+
+/**
+ * Move figure announcements onto the figure's own caption.
+ *
+ * While the narration says "The textbook includes Figure 1.2 here. It depicts
+ * ...", there is nothing in the prose to highlight, so the alignment holds
+ * the highlight on the last word of the preceding paragraph. The caption is
+ * what is being talked about, and it opens with the figure number just
+ * spoken, so resting there reads far better.
+ *
+ * The aligner cannot do this itself: it resyncs on consecutive matching
+ * words, and an announcement shares only "Figure 1.2" with the caption before
+ * diverging. It also has no notion of a caption -- which caption each word
+ * belongs to is DOM knowledge, passed in here as an id per written word (-1
+ * for words outside any caption).
+ *
+ * A run is only ever moved forward, so the highlight cannot appear to travel
+ * backwards through the page.
+ */
+export function parkAnnouncements(
+  spokenToWritten: Int32Array,
+  words: string[],
+  captionId: Int32Array,
+): ParkResult {
+  const starts = Int32Array.from(spokenToWritten)
+  const ends = Int32Array.from(spokenToWritten)
+
+  const captionStart = new Map<number, number>()
+  for (let i = 0; i < captionId.length; i++) {
+    if (captionId[i] >= 0 && !captionStart.has(captionId[i])) {
+      captionStart.set(captionId[i], i)
+    }
+  }
+  if (!captionStart.size) return { spokenToWritten: starts, parkEnd: ends }
+
+  let i = 0
+  while (i < starts.length) {
+    const parkedAt = starts[i]
+    let end = i
+    while (end + 1 < starts.length && starts[end + 1] === parkedAt) end++
+
+    const resumesAt = end + 1 < starts.length ? starts[end + 1] : -1
+    if (end - i + 1 >= MIN_ANNOUNCEMENT_WORDS && resumesAt > parkedAt) {
+      const caption = resumesAt >= 0 ? captionId[resumesAt] : -1
+      const start = caption >= 0 ? captionStart.get(caption) : undefined
+      if (start !== undefined && start > parkedAt) {
+        const labelEnd = captionLabelEnd(words, captionId, start)
+        for (let k = i; k <= end; k++) {
+          starts[k] = start
+          ends[k] = labelEnd
+        }
+      }
+    }
+    i = end + 1
+  }
+
+  return { spokenToWritten: starts, parkEnd: ends }
+}

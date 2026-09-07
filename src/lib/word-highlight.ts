@@ -8,7 +8,7 @@
  * keeping the active word comfortably in view.
  */
 
-import { alignWords } from "./word-align"
+import { alignWords, parkAnnouncements } from "./word-align"
 import {
   FOLLOW_BLOCK_TOP,
   FOLLOW_SCROLL_MS,
@@ -308,85 +308,23 @@ function updatePill(): void {
 }
 
 /**
- * Shortest run of narration-only words treated as an announcement rather than
- * an ordinary gap in the alignment.
+ * Which figure caption each word sits in, as an id per word (-1 outside any
+ * caption), so the parking algorithm can stay free of the DOM.
  */
-const MIN_ANNOUNCEMENT_WORDS = 4
-
-/**
- * Park figure announcements on the figure's own caption.
- *
- * While the narration says "The textbook includes Figure 1.2 here. It depicts
- * ...", there is nothing in the prose to highlight, so the alignment holds the
- * highlight on the last word of the preceding paragraph. The caption is what
- * is actually being talked about, and it opens with the figure number the
- * narration has just said, so resting there reads far better.
- *
- * The aligner cannot do this itself: it resyncs on three consecutive matching
- * words, and an announcement shares only "Figure 1.2" with the caption before
- * diverging. It also has no notion of a caption -- that is DOM knowledge.
- */
-const FIGURE_LABEL_WORDS = new Set(["figure", "fig", "table", "chart", "video"])
-
-/**
- * How far a caption's own label runs -- the "Figure 1.2" that opens it.
- *
- * Returned so an announcement can mark the whole label rather than just its
- * first word: the narration says "Figure 1.2", so highlighting only "Figure"
- * marks less than was said.
- */
-function captionLabelEnd(
-  wordSpans: HTMLSpanElement[],
-  start: number,
-  caption: Element,
-): number {
-  const first = (wordSpans[start]?.textContent ?? "").toLowerCase().replace(/[^a-z]/g, "")
-  if (!FIGURE_LABEL_WORDS.has(first)) return start
-  let end = start
-  for (let i = start + 1; i < wordSpans.length && i <= start + 2; i++) {
-    if (wordSpans[i].closest("figcaption") !== caption) break
-    // The number that follows the label word, e.g. "1.2" or "1.2:".
-    if (!/\d/.test(wordSpans[i].textContent ?? "")) break
-    end = i
-  }
-  return end
-}
-
-function parkAnnouncementsOnCaptions(
-  map: Int32Array,
-  wordSpans: HTMLSpanElement[],
-): Int32Array {
-  const ends = Int32Array.from(map)
-  const captionStart = new Map<Element, number>()
+function captionIds(wordSpans: HTMLSpanElement[]): Int32Array {
+  const ids = new Int32Array(wordSpans.length).fill(-1)
+  const seen = new Map<Element, number>()
   for (let i = 0; i < wordSpans.length; i++) {
     const caption = wordSpans[i].closest("figcaption")
-    if (caption && !captionStart.has(caption)) captionStart.set(caption, i)
-  }
-  if (!captionStart.size) return ends
-
-  let i = 0
-  while (i < map.length) {
-    const parkedAt = map[i]
-    let end = i
-    while (end + 1 < map.length && map[end + 1] === parkedAt) end++
-
-    const resumesAt = end + 1 < map.length ? map[end + 1] : -1
-    if (end - i + 1 >= MIN_ANNOUNCEMENT_WORDS && resumesAt > parkedAt) {
-      const caption = wordSpans[resumesAt]?.closest("figcaption")
-      const start = caption ? captionStart.get(caption) : undefined
-      // Only ever move a parked run forward, so the highlight cannot appear
-      // to travel backwards.
-      if (start !== undefined && start > parkedAt) {
-        const labelEnd = captionLabelEnd(wordSpans, start, caption as Element)
-        for (let k = i; k <= end; k++) {
-          map[k] = start
-          ends[k] = labelEnd
-        }
-      }
+    if (!caption) continue
+    let id = seen.get(caption)
+    if (id === undefined) {
+      id = seen.size
+      seen.set(caption, id)
     }
-    i = end + 1
+    ids[i] = id
   }
-  return ends
+  return ids
 }
 
 /**
@@ -527,13 +465,19 @@ function initWordHighlight(): void {
       spokenWords = data
       spans = wrapArticleWords(target)
 
+      const writtenWords = spans.map((span) => span.textContent ?? "")
       const alignment = alignWords(
         spokenWords.map((word) => word.w),
-        spans.map((span) => span.textContent ?? ""),
+        writtenWords,
       )
-      spokenToWritten = alignment.spokenToWritten
+      const parked = parkAnnouncements(
+        alignment.spokenToWritten,
+        writtenWords,
+        captionIds(spans),
+      )
+      spokenToWritten = parked.spokenToWritten
       writtenToSpoken = alignment.writtenToSpoken
-      parkEnd = parkAnnouncementsOnCaptions(spokenToWritten, spans)
+      parkEnd = parked.parkEnd
 
       // Transcript timestamps are used as-is, with no correction factor.
       //

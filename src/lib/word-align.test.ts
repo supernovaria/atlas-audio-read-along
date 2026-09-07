@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { alignWords, normalizeToken } from "./word-align"
+import { alignWords, normalizeToken, parkAnnouncements } from "./word-align"
 
 const toks = (text: string) => text.split(" ").filter(Boolean)
 
@@ -150,5 +150,88 @@ describe("alignWords", () => {
     expect(matched).toBe(0)
     expect(spokenToWritten.length).toBe(0)
     expect(writtenToSpoken.length).toBe(0)
+  })
+})
+
+describe("parkAnnouncements", () => {
+  // Helpers mirroring what the page supplies: the words as rendered, and
+  // which figure caption (if any) each one sits in.
+  const captions = (spec: string) =>
+    Int32Array.from(spec.split(" ").filter(Boolean).map(Number))
+
+  // While the narration describes a figure there is nothing in the prose to
+  // highlight, so the alignment holds on the preceding word. Readers should
+  // see the highlight move to the caption of the figure being described.
+  it("moves an announcement onto the caption being described", () => {
+    // Six spoken words park on written word 2; the prose resumes inside the
+    // caption at word 4, whose caption starts at word 3.
+    const spokenToWritten = Int32Array.from([0, 1, 2, 2, 2, 2, 2, 2, 4])
+    const words = toks("intelligence is measured Figure 1.2 shows benchmark scores")
+    const { spokenToWritten: parked, parkEnd } = parkAnnouncements(
+      spokenToWritten,
+      words,
+      captions("-1 -1 -1 0 0 0 0 -1 -1"),
+    )
+    for (let i = 2; i <= 7; i++) expect(parked[i]).toBe(3)
+    // "Figure 1.2" is two words and both are spoken, so both are marked.
+    expect(parkEnd[2]).toBe(4)
+  })
+
+  // The guarantee that matters: a reader must never see the highlight jump
+  // backwards to a caption they have already passed.
+  it("never moves a parked run backwards", () => {
+    // The prose resumes in a caption that sits *before* the parked position,
+    // which is what a figure referenced again later looks like.
+    const spokenToWritten = Int32Array.from([6, 6, 6, 6, 6, 1])
+    const words = toks("caption Figure 1.2 here later prose continues onward")
+    const { spokenToWritten: parked } = parkAnnouncements(
+      spokenToWritten,
+      words,
+      captions("0 0 0 0 -1 -1 -1 -1"),
+    )
+    // The run itself must stay put; only the aligner's own resume point moves on.
+    for (let i = 0; i < 5; i++) expect(parked[i]).toBe(6)
+  })
+
+  // Ordinary alignment gaps -- a word or two the transcriber dropped -- are
+  // not announcements. Parking those on a caption would yank the highlight
+  // out of the sentence the reader is following.
+  it("leaves short gaps where the aligner put them", () => {
+    const spokenToWritten = Int32Array.from([0, 1, 1, 1, 3])
+    const words = toks("prose here Figure 1.2 caption")
+    const { spokenToWritten: parked } = parkAnnouncements(
+      spokenToWritten,
+      words,
+      captions("-1 -1 0 0 0"),
+    )
+    expect(Array.from(parked)).toEqual([0, 1, 1, 1, 3])
+  })
+
+  // A caption whose text is an ordinary sentence has no "Figure N" label to
+  // mark, so the highlight should sit on its first word alone rather than
+  // marking an arbitrary two-word run.
+  it("marks only the first word when the caption has no figure label", () => {
+    const spokenToWritten = Int32Array.from([0, 0, 0, 0, 0, 3])
+    const words = toks("prose and then benchmark scores over time")
+    const { parkEnd } = parkAnnouncements(
+      spokenToWritten,
+      words,
+      captions("-1 -1 -1 0 0 0 0"),
+    )
+    expect(parkEnd[0]).toBe(3)
+  })
+
+  // A section with no figures at all must come back untouched; the parking
+  // pass runs on every page, including those.
+  it("leaves a page without captions unchanged", () => {
+    const spokenToWritten = Int32Array.from([0, 1, 1, 1, 1, 1, 2])
+    const words = toks("prose without any figures at all here")
+    const { spokenToWritten: parked, parkEnd } = parkAnnouncements(
+      spokenToWritten,
+      words,
+      captions("-1 -1 -1 -1 -1 -1 -1"),
+    )
+    expect(Array.from(parked)).toEqual([0, 1, 1, 1, 1, 1, 2])
+    expect(Array.from(parkEnd)).toEqual([0, 1, 1, 1, 1, 1, 2])
   })
 })
