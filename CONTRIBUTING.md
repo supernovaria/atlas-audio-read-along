@@ -28,6 +28,7 @@ pnpm dev --host 0.0.0.0
 | Inline equations, footnotes, callouts | ✓                 | All rendered from the cache              |
 | Figures                               | Caption only      | Image assets are not committed           |
 | PDF / audio                           | Skipped           | Maintainer-only, gated by `BuildMode`    |
+| Chapter 1 narration + read-along      | ✓                 | Streams the published audio (see below)  |
 
 The build prints which mode it resolved at startup:
 
@@ -37,15 +38,14 @@ The build prints which mode it resolved at startup:
 
 ### Chapter 1 read-along audio
 
-Chapter 1 ships word-level timings (`public/audio/ch1/*.words.json`) so the narration can highlight the text as it plays. The MP3s are not committed -- they are large and reproducible -- so which file a page plays depends on what the build has:
+Chapter 1 ships word-level timings (`public/audio/ch1/*.words.json`) so the narration can highlight the text as it plays. The MP3s are not committed -- they are large and reproducible -- so a page plays whichever source the build has:
 
-| The build has                                                | The page plays                | Read-along |
-| ------------------------------------------------------------ | ----------------------------- | ---------- |
-| Local MP3s staged by `scripts/copy-ch1-audio.sh`             | Those, constant bitrate       | Yes, seeks exactly |
-| Published audio (maintainer credentials)                      | The CDN file, variable bitrate | Yes, seeks approximately |
-| Neither                                                       | No player                     | -- |
+| Source | Where it comes from                                                        | Seeking |
+| ------ | -------------------------------------------------------------------------- | ------- |
+| `cbr`  | Staged locally by `scripts/copy-ch1-audio.sh`. Preferred.                   | Exact -- constant bitrate |
+| `cdn`  | The published file: `section.audioLink` in a build with credentials, otherwise the URL pinned in `src/data/ch1-timing.ts`. | Approximate -- the published file is variable bitrate, and browsers interpolate |
 
-Staging needs the podcast pipeline's `output/capabilities` directory; point the script at it with `ATLAS_AUDIO_SRC` if it is not next to this repo. Work on click-a-word-to-seek wants the staged files, because a browser seeks a variable-bitrate MP3 by interpolation and lands near, not on, the word.
+So a plain clone still gets the read-along, streamed from the published audio; staging the local files is only needed for exact seeking, which is what work on click-a-word-to-seek wants. Staging needs the podcast pipeline's `output/capabilities` directory -- point the script at it with `ATLAS_AUDIO_SRC` if it is not next to this repo. Sections with neither source render no player at all.
 
 ## Environment variables
 
