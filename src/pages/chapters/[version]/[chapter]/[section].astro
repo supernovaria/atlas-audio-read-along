@@ -80,11 +80,11 @@ const lecture = resolveResource(chapter.meta.lecture);
 const paper = resolveResource(chapter.meta.paper);
 ---
 <Fragment set:html={`<!--
-    AI Safety Atlas — the open textbook for AI Safety
+    AI Safety Atlas â€” the open textbook for AI Safety
     Published by the French Center for AI Safety (CeSIA)
     https://ai-safety-atlas.com
 
-    This page: Chapter ${chapter.number}, Section ${section.number} — ${section.title}
+    This page: Chapter ${chapter.number}, Section ${section.number} â€” ${section.title}
     Authors: ${chapter.meta.authors.map(a => a.name).join(', ')}
     Version: ${version}
 
@@ -102,8 +102,8 @@ const paper = resolveResource(chapter.meta.paper);
 
     <div class="py-12 lg:py-16 px-6 lg:px-16" slot="header">
         <div>
-            <p class="text-base/7 font-semibold text-gray-600">Chapter {chapter.number}: {chapter.title}</p>
-            <h1 class="mt-2 text-4xl lg:text-5xl font-semibold tracking-tight text-gray-900 text-balance font-display">{section.title}</h1>
+            <p data-narration-heading class="text-base/7 font-semibold text-gray-600">Chapter {chapter.number}: {chapter.title}</p>
+            <h1 data-narration-heading class="mt-2 text-4xl lg:text-5xl font-semibold tracking-tight text-gray-900 text-balance font-display">{section.title}</h1>
             {pageDescription && <p class="mt-6 text-lg font-medium text-pretty text-gray-700">{pageDescription}</p>}
             <ul class="flex flex-wrap gap-x-6 gap-y-2 mt-8">
                 <li class="flex items-center space-x-1 text-gray-600 text-sm">

@@ -65,6 +65,7 @@ let followedBlock: Element | null = null
 let seekArmed = false
 let pageAudioUrl = ""
 let article: Element | null = null
+let roots: Element[] = []
 let pill: HTMLButtonElement | null = null
 let cancelGlide: (() => void) | null = null
 let teardown: Array<() => void> = []
@@ -123,6 +124,24 @@ function pickArticle(): Element | null {
 }
 
 /**
+ * The heading lines the narration reads before the prose starts.
+ *
+ * Every section opens with "Section 1.2: Current Capabilities", and the
+ * chapter's first section is preceded by "Chapter 1: Capabilities". Those
+ * words are printed on the page, above the article, so highlighting them
+ * makes the read-along visibly live from the first second rather than
+ * appearing part-way down the page once the prose begins.
+ *
+ * Like the article, the heading is rendered once per breakpoint, so only the
+ * copy actually on screen is wrapped.
+ */
+function pickHeadings(): Element[] {
+  const all = Array.from(document.querySelectorAll("[data-narration-heading]"))
+  const visible = all.filter((el) => (el as HTMLElement).offsetParent !== null)
+  return visible.length ? visible : all
+}
+
+/**
  * Wrap every narrated word in its own span.
  *
  * This descends through inline markup rather than only touching direct text
@@ -164,9 +183,14 @@ function wrapWordsIn(root: Element, out: HTMLSpanElement[]): void {
   }
 }
 
-function wrapArticleWords(root: Element): HTMLSpanElement[] {
+/**
+ * Wrap the narrated text of the page, in the order it is read out: the
+ * heading lines first, then the article's own blocks.
+ */
+function wrapNarratedWords(headings: Element[], article: Element): HTMLSpanElement[] {
   const out: HTMLSpanElement[] = []
-  for (const block of Array.from(root.querySelectorAll(WRAPPABLE_SELECTOR))) {
+  for (const heading of headings) wrapWordsIn(heading, out)
+  for (const block of Array.from(article.querySelectorAll(WRAPPABLE_SELECTOR))) {
     if (block.closest(UNSPOKEN_SELECTOR)) continue
     wrapWordsIn(block, out)
   }
@@ -411,7 +435,7 @@ function onArticleClick(event: MouseEvent): void {
 
 function setArmed(armed: boolean): void {
   seekArmed = armed
-  article?.classList.toggle("read-along-active", armed)
+  for (const root of roots) root.classList.toggle("read-along-active", armed)
   updatePill()
 }
 
@@ -420,6 +444,10 @@ function cleanup(): void {
   teardown = []
   cancelGlide?.()
   spokenWords = []
+  // Drop the highlight before the spans are forgotten. Re-wrapping after a
+  // breakpoint change builds a fresh list, and a leftover .word-active on the
+  // copy that is now hidden reappears the moment the reader resizes back.
+  for (const span of spans) span.classList.remove("word-active")
   spans = []
   spanIndex = new WeakMap()
   spokenToWritten = null
@@ -432,6 +460,7 @@ function cleanup(): void {
   seekArmed = false
   pageAudioUrl = ""
   article = null
+  roots = []
   if (pill) pill.hidden = true
 }
 
@@ -456,6 +485,7 @@ function initWordHighlight(): void {
   article = pickArticle()
   const audio = getAudio()
   if (!article || !audio) return
+  roots = [...pickHeadings(), article]
 
   fetch(wordsUrl)
     .then((response) => response.json())
@@ -463,7 +493,7 @@ function initWordHighlight(): void {
       const target = article
       if (!Array.isArray(data) || !data.length || !target) return
       spokenWords = data
-      spans = wrapArticleWords(target)
+      spans = wrapNarratedWords(pickHeadings(), target)
 
       const writtenWords = spans.map((span) => span.textContent ?? "")
       const alignment = alignWords(
@@ -521,7 +551,7 @@ function initWordHighlight(): void {
         refreshArmed()
       })
 
-      on(target, "click", onArticleClick as EventListener)
+      for (const root of roots) on(root, "click", onArticleClick as EventListener)
       on(window, "wheel", onManualScroll, { passive: true })
       on(window, "touchmove", onManualScroll, { passive: true })
       on(window, "keydown", ((event: KeyboardEvent) => {
