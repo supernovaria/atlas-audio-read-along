@@ -45,7 +45,15 @@ Chapter 1 ships word-level timings (`public/audio/ch1/*.words.json`) so the narr
 | `cbr`  | Staged locally by `scripts/copy-ch1-audio.sh`. Preferred.                   | Exact -- constant bitrate |
 | `cdn`  | The published file: `section.audioLink` in a build with credentials, otherwise the URL pinned in `src/data/ch1-timing.ts`. | Approximate -- the published file is variable bitrate, and browsers interpolate |
 
-So a plain clone still gets the read-along, streamed from the published audio; staging the local files is only needed for exact seeking, which is what work on click-a-word-to-seek wants. Staging needs the podcast pipeline's `output/capabilities` directory -- point the script at it with `ATLAS_AUDIO_SRC` if it is not next to this repo. Sections with neither source render no player at all.
+So a plain clone still gets the read-along, streamed from the published audio; staging the local files is only needed for exact seeking, which is what work on click-a-word-to-seek wants. Sections with neither source render no player at all.
+
+To stage them:
+
+```bash
+scripts/copy-ch1-audio.sh --fetch
+```
+
+That downloads the published audio and re-encodes it, and needs only `curl` and `ffmpeg`. Without `--fetch` the script copies from the podcast pipeline's `output/capabilities` directory instead, if you have one -- point it elsewhere with `ATLAS_AUDIO_SRC`. Both routes produce the same audio.
 
 `pnpm dev` adds a small switch above the player (`source: cbr | auto cbr cdn none`) that forces a source and reloads, including `none` for checking that the page degrades without a player. It exists only in dev builds.
 
