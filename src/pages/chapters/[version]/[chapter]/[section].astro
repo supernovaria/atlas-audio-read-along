@@ -8,7 +8,7 @@ import { Icon } from 'astro-icon/components'
 import { getTextbooks } from "@/lib/textbooks";
 import { siteConfig } from "@/config/site";
 import { sectionOgImageUrl } from "@/lib/og";
-import ch1Timing from '@/data/ch1-timing';
+import { resolveSectionAudio } from '@/lib/section-audio';
 
 interface Props {
     version: string
@@ -45,7 +45,7 @@ export async function getStaticPaths() {
 }
 
 const { version, section, chapter, textbook } = Astro.props;
-const sectionTiming = chapter.number === 1 ? (ch1Timing[section.number] ?? null) : null;
+const sectionAudio = resolveSectionAudio(chapter.number, section.number, section.audioLink);
 
 let pageDescription = section.number === 1 ? chapter.meta.description : section.description
 
@@ -53,7 +53,7 @@ const ogImage = sectionOgImageUrl({
     eyebrow: `Chapter ${chapter.number}: ${chapter.title}`,
     title: section.title,
     description: pageDescription,
-    audio: !!section.audioLink,
+    audio: !!sectionAudio,
     edition: `Edition ${version.replace('v', '')}`,
 });
 
@@ -68,6 +68,7 @@ function getSectionInfo(ref: SectionRef | null) {
 
 const prevInfo = getSectionInfo(section.prevSection);
 const nextInfo = getSectionInfo(section.nextSection);
+const nextSectionAudio = nextInfo ? resolveSectionAudio(nextInfo.chapter.number, nextInfo.section.number, nextInfo.section.audioLink) : null;
 
 // Check if this is the last section in the textbook
 const isLastSection = section.nextSection === null;
@@ -118,7 +119,7 @@ const paper = resolveResource(chapter.meta.paper);
                 </li>
             </ul>
             {(() => {
-                const hasAudio = !!(section.audioLink || sectionTiming);
+                const hasAudio = !!sectionAudio;
                 const isFirstSection = section.number === 1;
 
                 const hasVideo = isFirstSection && lecture;
@@ -339,16 +340,16 @@ const paper = resolveResource(chapter.meta.paper);
         </nav>
     </article>
 
-    {(section.audioLink || sectionTiming) && (
+    {sectionAudio && (
     <div id="audio-page-data" class="hidden"
-        data-audio-url={sectionTiming ? sectionTiming.audioUrl : (section.audioLink ?? '')}
-        data-words-url={sectionTiming?.wordsUrl ?? ''}
+        data-audio-url={sectionAudio.audioUrl}
+        data-words-url={sectionAudio.wordsUrl ?? ''}
         data-section-title={`${chapter.number}.${section.number} ${section.title}`}
         data-chapter-title={chapter.title}
         data-chapter-number={String(chapter.number)}
         data-section-number={String(section.number)}
         data-next-url={nextInfo ? `/chapters/${version}/${nextInfo.chapter.slug}/${nextInfo.section.slug}` : ''}
-        data-next-audio-url={nextInfo?.section.audioLink || ''}
+        data-next-audio-url={nextSectionAudio?.audioUrl ?? ''}
     ></div>
     )}
 

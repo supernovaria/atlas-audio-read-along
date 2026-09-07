@@ -35,6 +35,18 @@ The build prints which mode it resolved at startup:
 [atlas] BuildMode: contributor, cache-only, no PDF, no audio, no R2 audio pull, no Algolia indexing, search enabled
 ```
 
+### Chapter 1 read-along audio
+
+Chapter 1 ships word-level timings (`public/audio/ch1/*.words.json`) so the narration can highlight the text as it plays. The MP3s are not committed -- they are large and reproducible -- so which file a page plays depends on what the build has:
+
+| The build has                                                | The page plays                | Read-along |
+| ------------------------------------------------------------ | ----------------------------- | ---------- |
+| Local MP3s staged by `scripts/copy-ch1-audio.sh`             | Those, constant bitrate       | Yes, seeks exactly |
+| Published audio (maintainer credentials)                      | The CDN file, variable bitrate | Yes, seeks approximately |
+| Neither                                                       | No player                     | -- |
+
+Staging needs the podcast pipeline's `output/capabilities` directory; point the script at it with `ATLAS_AUDIO_SRC` if it is not next to this repo. Work on click-a-word-to-seek wants the staged files, because a browser seeks a variable-bitrate MP3 by interpolation and lands near, not on, the word.
+
 ## Environment variables
 
 All env vars are optional. Copy `.env.example` to `.env` and fill in only the ones you need.
