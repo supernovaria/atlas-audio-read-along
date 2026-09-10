@@ -9,6 +9,7 @@
  */
 
 import { alignWords, parkAnnouncements } from "./word-align"
+import { groupSentences } from "./sentences"
 import {
   FOLLOW_BLOCK_TOP,
   FOLLOW_SCROLL_MS,
@@ -42,6 +43,8 @@ const WRAPPABLE_SELECTOR = "p, figcaption, h2, h3, h4"
 const UNSPOKEN_SELECTOR =
   ".footnote-ref, .inline-equation, .notebox-content, .if-js"
 
+const SENTENCE_HIGHLIGHT = "read-along-sentence"
+
 const SCROLL_KEYS = new Set([
   "PageUp",
   "PageDown",
@@ -60,6 +63,8 @@ let writtenToSpoken: Int32Array | null = null
 let activeIdx = -1
 let activeEnd = -1
 let parkEnd: Int32Array | null = null
+let sentenceOf: Int32Array | null = null
+let activeSentence = -1
 let followMode = true
 let followedBlock: Element | null = null
 let seekArmed = false
@@ -186,15 +191,64 @@ function wrapWordsIn(root: Element, out: HTMLSpanElement[]): void {
 /**
  * Wrap the narrated text of the page, in the order it is read out: the
  * heading lines first, then the article's own blocks.
+ *
+ * Returns which block each word came from as well, which is what keeps a
+ * sentence from running out of a heading and into the paragraph below it.
  */
-function wrapNarratedWords(headings: Element[], article: Element): HTMLSpanElement[] {
+function wrapNarratedWords(
+  headings: Element[],
+  article: Element,
+): { spans: HTMLSpanElement[]; blockIds: Int32Array } {
   const out: HTMLSpanElement[] = []
-  for (const heading of headings) wrapWordsIn(heading, out)
-  for (const block of Array.from(article.querySelectorAll(WRAPPABLE_SELECTOR))) {
-    if (block.closest(UNSPOKEN_SELECTOR)) continue
-    wrapWordsIn(block, out)
+  const blocks: number[] = []
+  let block = 0
+
+  const wrapBlock = (element: Element) => {
+    const before = out.length
+    wrapWordsIn(element, out)
+    for (let i = before; i < out.length; i++) blocks.push(block)
+    block++
   }
-  return out
+
+  for (const heading of headings) wrapBlock(heading)
+  for (const element of Array.from(article.querySelectorAll(WRAPPABLE_SELECTOR))) {
+    if (element.closest(UNSPOKEN_SELECTOR)) continue
+    wrapBlock(element)
+  }
+  return { spans: out, blockIds: Int32Array.from(blocks) }
+}
+
+/**
+ * Underline the sentence being narrated.
+ *
+ * Drawn with a highlight range rather than a class on each word, because a
+ * class underlines the words and not the spaces between them, and because
+ * marking a sentence would otherwise mean touching a hundred elements every
+ * few seconds -- the same repainting that made playback stutter before.
+ * Browsers without the API keep the word highlight and lose only this.
+ */
+function markSentence(index: number): void {
+  if (!CSS.highlights) return
+  if (index === activeSentence) return
+  activeSentence = index
+
+  if (index < 0 || !sentenceOf) {
+    CSS.highlights.delete(SENTENCE_HIGHLIGHT)
+    return
+  }
+  let first = -1
+  let last = -1
+  for (let i = 0; i < sentenceOf.length; i++) {
+    if (sentenceOf[i] !== index) continue
+    if (first < 0) first = i
+    last = i
+  }
+  if (first < 0 || !spans[first] || !spans[last]) return
+
+  const range = document.createRange()
+  range.setStartBefore(spans[first])
+  range.setEndAfter(spans[last])
+  CSS.highlights.set(SENTENCE_HIGHLIGHT, new Highlight(range))
 }
 
 /**
@@ -359,6 +413,7 @@ function captionIds(wordSpans: HTMLSpanElement[]): Int32Array {
  * matches what is marked on the page.
  */
 function setActive(start: number, end: number = start): void {
+  markSentence(start >= 0 && sentenceOf ? (sentenceOf[start] ?? -1) : -1)
   if (start === activeIdx && end === activeEnd) return
   for (let i = activeIdx; activeIdx >= 0 && i <= activeEnd; i++) {
     spans[i]?.classList.remove("word-active")
@@ -455,6 +510,9 @@ function cleanup(): void {
   activeIdx = -1
   activeEnd = -1
   parkEnd = null
+  sentenceOf = null
+  activeSentence = -1
+  CSS.highlights?.delete(SENTENCE_HIGHLIGHT)
   followMode = true
   followedBlock = null
   seekArmed = false
@@ -493,9 +551,11 @@ function initWordHighlight(): void {
       const target = article
       if (!Array.isArray(data) || !data.length || !target) return
       spokenWords = data
-      spans = wrapNarratedWords(pickHeadings(), target)
+      const wrapped = wrapNarratedWords(pickHeadings(), target)
+      spans = wrapped.spans
 
       const writtenWords = spans.map((span) => span.textContent ?? "")
+      sentenceOf = groupSentences(writtenWords, wrapped.blockIds)
       const alignment = alignWords(
         spokenWords.map((word) => word.w),
         writtenWords,

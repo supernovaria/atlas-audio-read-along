@@ -180,6 +180,16 @@
   border-bottom-left-radius: 0;
 }
 
+/* The sentence being narrated, drawn under the whole sentence including its
+   spaces. Kept to a thin light-blue rule: it has to be findable at a glance
+   without competing with the word highlight sitting inside it. */
+::highlight(read-along-sentence) {
+  text-decoration-line: underline;
+  text-decoration-color: var(--color-brand-300);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
 /* Words are only clickable while this page's narration is playing, so the
    pointer affordance is scoped to that state rather than always present. */
 .read-along-active .word-span {
