@@ -4,6 +4,9 @@ import { groupSentences } from "./sentences"
 const oneBlock = (n: number) => new Int32Array(n).fill(0)
 const words = (text: string) => text.split(" ").filter(Boolean)
 
+// Which words the sentence rule underlines. Split in the wrong place and
+// the rule marks half a sentence, or runs a heading into the paragraph
+// below it.
 describe("groupSentences", () => {
   // The underline marks one sentence at a time, so consecutive sentences have
   // to come back as different groups -- otherwise the whole paragraph lights

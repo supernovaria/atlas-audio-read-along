@@ -9,6 +9,9 @@ const CDN = "https://atlas.foreviewusercontent.com/audio/atlas-ch1-s1-abc.mp3"
 const staged = () => true
 const notStaged = () => false
 
+// Which file a section page plays. Getting this wrong shows a reader a
+// player that loads nothing, or silently drops them onto audio the word
+// timings do not match.
 describe("resolveSectionAudio", () => {
   // Locally staged audio is constant bitrate, so a seek lands where the word
   // timings say it will. Preferring the published file instead would make
@@ -87,6 +90,9 @@ describe("resolveSectionAudio", () => {
   })
 })
 
+// Reads the development-only source override. It comes from a value a
+// person can type, so anything unrecognised has to mean "no override"
+// rather than a broken page.
 describe("parseAudioSourceOverride", () => {
   // The override arrives from a query string a reader could type anything
   // into. Anything unrecognised has to mean "no override", not a broken page.
@@ -100,6 +106,8 @@ describe("parseAudioSourceOverride", () => {
   })
 })
 
+// What the development switch offers. If it advertises a source this build
+// cannot serve, pressing it produces silence with no explanation.
 describe("availableAudioSources", () => {
   // The switch marks options this build cannot serve, so pressing one and
   // getting silence is never a surprise.

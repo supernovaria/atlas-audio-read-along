@@ -15,6 +15,9 @@ import {
 
 const VIEWPORT = 800
 
+// Where the page puts the line being read. Get this wrong and the reader
+// follows the narration from the bottom of the screen, with every next
+// sentence still off-screen.
 describe("reading position", () => {
   // Text is placed above the middle of the screen so the reader can see what
   // is coming. If this drifted to the centre or below, reading would happen
@@ -25,6 +28,9 @@ describe("reading position", () => {
   })
 })
 
+// When the page is allowed to move under the reader. Too eager and it
+// twitches on every word; too reluctant and the narration walks off the
+// screen while the reader waits.
 describe("isOutsideFollowBand", () => {
   // Within a paragraph the page should stay still; this band is only the
   // rescue for paragraphs taller than the screen. Too tight a band and the
@@ -49,6 +55,8 @@ describe("isOutsideFollowBand", () => {
   })
 })
 
+// Where a follow scroll lands. A wrong target either overshoots the word
+// being spoken or leaves it at the very edge of the screen.
 describe("scrollTargetFor", () => {
   // The glide exists to land the narration on the reading line. If this
   // arithmetic is wrong the page settles with the text in the wrong place, or
@@ -71,6 +79,8 @@ describe("scrollTargetFor", () => {
   })
 })
 
+// Whether arriving at a new paragraph should move the page. This is what
+// makes the page advance a paragraph at a time rather than continuously.
 describe("shouldFollowNewBlock", () => {
   // Reaching a new paragraph that is already at or above the reading line
   // needs no scroll -- and scrolling backwards to reach it would drag the
@@ -87,6 +97,8 @@ describe("shouldFollowNewBlock", () => {
   })
 })
 
+// Which way the "jump back to the narration" button points, and whether it
+// appears at all. A wrong answer sends the reader the wrong way.
 describe("offscreenDirection", () => {
   // The pill is an interruption, so it stays away while the word is visible
   // or only just past the fold.
@@ -104,6 +116,8 @@ describe("offscreenDirection", () => {
   })
 })
 
+// The shape of the follow scroll. Without easing the page jumps, which is
+// the thing that makes a moving page hard to read.
 describe("easeInOutQuad", () => {
   // The glide must start where the page is and finish exactly on target; an
   // easing that misses either end leaves the page part-scrolled.
@@ -124,6 +138,8 @@ describe("easeInOutQuad", () => {
   })
 })
 
+// The geometry the rest of the follow logic is built on; if it is wrong,
+// every scroll decision above it is wrong too.
 describe("centreOf", () => {
   // Every decision above keys off this, so an off-by-half here would bias the
   // whole feature toward one edge of the screen.

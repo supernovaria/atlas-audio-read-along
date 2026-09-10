@@ -3,6 +3,9 @@ import { alignWords, normalizeToken, parkAnnouncements } from "./word-align"
 
 const toks = (text: string) => text.split(" ").filter(Boolean)
 
+// How a spoken word is compared with a printed one. Miss a difference the
+// two streams routinely have -- case, accents, punctuation -- and ordinary
+// words stop matching, so the highlight resyncs instead of tracking.
 describe("normalizeToken", () => {
   // Transcript and page differ in case, accents and punctuation for the same
   // word. If normalisation misses any of those, ordinary words stop matching
@@ -22,6 +25,8 @@ describe("normalizeToken", () => {
   })
 })
 
+// The map from narration to page text. When this is wrong the highlight is
+// on the wrong word, and clicking a word seeks to the wrong place.
 describe("alignWords", () => {
   // The base case the whole feature rests on: when narration and page agree,
   // every spoken word highlights its own word. If this breaks, the highlight
@@ -153,6 +158,9 @@ describe("alignWords", () => {
   })
 })
 
+// Where the highlight rests while the narration describes a figure. The
+// prose has nothing to mark during those seconds, so it parks on the
+// figure's caption instead of sliding through unrelated text.
 describe("parkAnnouncements", () => {
   // Helpers mirroring what the page supplies: the words as rendered, and
   // which figure caption (if any) each one sits in.
