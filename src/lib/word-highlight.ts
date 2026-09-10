@@ -43,8 +43,6 @@ const WRAPPABLE_SELECTOR = "p, figcaption, h2, h3, h4"
 const UNSPOKEN_SELECTOR =
   ".footnote-ref, .inline-equation, .notebox-content, .if-js"
 
-const SENTENCE_HIGHLIGHT = "read-along-sentence"
-
 const SCROLL_KEYS = new Set([
   "PageUp",
   "PageDown",
@@ -65,6 +63,7 @@ let activeEnd = -1
 let parkEnd: Int32Array | null = null
 let sentenceOf: Int32Array | null = null
 let activeSentence = -1
+let sentenceRules: HTMLElement[] = []
 let followMode = true
 let followedBlock: Element | null = null
 let seekArmed = false
@@ -221,21 +220,17 @@ function wrapNarratedWords(
 /**
  * Underline the sentence being narrated.
  *
- * Drawn with a highlight range rather than a class on each word, because a
- * class underlines the words and not the spaces between them, and because
- * marking a sentence would otherwise mean touching a hundred elements every
- * few seconds -- the same repainting that made playback stutter before.
- * Browsers without the API keep the word highlight and lose only this.
+ * Drawn as a thin element under each line the sentence covers, rather than as
+ * a text decoration. Every decoration route comes out dashed: a class on the
+ * words leaves the spaces between them bare, and a highlight range is painted
+ * per element, so a sentence split into word spans breaks at every span.
+ * Drawing it also puts the rule below the word highlight rather than inside
+ * its background box, where the highlight would cut through it.
  */
-function markSentence(index: number): void {
-  if (!CSS.highlights) return
-  if (index === activeSentence) return
-  activeSentence = index
+const SENTENCE_RULE_GAP = 2
 
-  if (index < 0 || !sentenceOf) {
-    CSS.highlights.delete(SENTENCE_HIGHLIGHT)
-    return
-  }
+function sentenceRange(index: number): Range | null {
+  if (index < 0 || !sentenceOf) return null
   let first = -1
   let last = -1
   for (let i = 0; i < sentenceOf.length; i++) {
@@ -243,12 +238,71 @@ function markSentence(index: number): void {
     if (first < 0) first = i
     last = i
   }
-  if (first < 0 || !spans[first] || !spans[last]) return
-
+  if (first < 0 || !spans[first] || !spans[last]) return null
   const range = document.createRange()
   range.setStartBefore(spans[first])
   range.setEndAfter(spans[last])
-  CSS.highlights.set(SENTENCE_HIGHLIGHT, new Highlight(range))
+  return range
+}
+
+/**
+ * One rectangle per line of the sentence.
+ *
+ * A range over wrapped words reports a rectangle per span, so they are merged
+ * by the line they sit on -- otherwise the rule would be drawn in fragments
+ * with a gap at every space.
+ */
+function lineRects(range: Range): DOMRect[] {
+  const lines: DOMRect[] = []
+  for (const rect of Array.from(range.getClientRects())) {
+    if (rect.width <= 0 || rect.height <= 0) continue
+    const line = lines.find((l) => Math.abs(l.bottom - rect.bottom) < rect.height / 2)
+    if (!line) {
+      lines.push(new DOMRect(rect.x, rect.y, rect.width, rect.height))
+      continue
+    }
+    const left = Math.min(line.left, rect.left)
+    const right = Math.max(line.right, rect.right)
+    const top = Math.min(line.top, rect.top)
+    const bottom = Math.max(line.bottom, rect.bottom)
+    lines[lines.indexOf(line)] = new DOMRect(left, top, right - left, bottom - top)
+  }
+  return lines
+}
+
+/**
+ * Position the rules in page coordinates, so scrolling does not move them and
+ * only a reflow -- a resize, a font arriving -- needs them recomputed.
+ */
+function drawSentenceRule(): void {
+  const range = sentenceRange(activeSentence)
+  const rects = range ? lineRects(range) : []
+
+  while (sentenceRules.length < rects.length) {
+    const rule = document.createElement("div")
+    rule.className = "sentence-rule"
+    rule.hidden = true
+    document.body.appendChild(rule)
+    sentenceRules.push(rule)
+  }
+  for (let i = 0; i < sentenceRules.length; i++) {
+    const rule = sentenceRules[i]
+    const rect = rects[i]
+    if (!rect) {
+      rule.hidden = true
+      continue
+    }
+    rule.style.left = `${rect.left + window.scrollX}px`
+    rule.style.top = `${rect.bottom + window.scrollY + SENTENCE_RULE_GAP}px`
+    rule.style.width = `${rect.width}px`
+    rule.hidden = false
+  }
+}
+
+function markSentence(index: number): void {
+  if (index === activeSentence) return
+  activeSentence = index
+  drawSentenceRule()
 }
 
 /**
@@ -512,7 +566,7 @@ function cleanup(): void {
   parkEnd = null
   sentenceOf = null
   activeSentence = -1
-  CSS.highlights?.delete(SENTENCE_HIGHLIGHT)
+  for (const rule of sentenceRules) rule.hidden = true
   followMode = true
   followedBlock = null
   seekArmed = false
@@ -633,6 +687,9 @@ function initWordHighlight(): void {
         resizeTimer = setTimeout(() => {
           const visible = pickArticle()
           if (visible && visible !== article) initWordHighlight()
+          // The rules are positioned from measured text, so a reflow leaves
+          // them behind even when the same copy stays on screen.
+          else drawSentenceRule()
         }, 200)
       })
       teardown.push(() => clearTimeout(resizeTimer))

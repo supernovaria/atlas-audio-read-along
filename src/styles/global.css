@@ -155,10 +155,16 @@
   contain: paint;
 }
 
+/* The ring widens the highlight sideways without the reflow that padding
+   would cause. It deliberately does not extend downwards: the chip already
+   covers the descenders, and anything below the baseline would sit on top of
+   the sentence underline and break it. */
 .word-active {
   @apply bg-brand-100 text-brand-900;
   border-radius: 0.125rem;
-  box-shadow: 0 0 0 2px var(--color-brand-100);
+  box-shadow:
+    2px 0 0 0 var(--color-brand-100),
+    -2px 0 0 0 var(--color-brand-100);
 }
 
 /* A figure announcement marks the whole label ("Figure 1.2"), which is two
@@ -171,8 +177,8 @@
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
   box-shadow:
-    0 0 0 2px var(--color-brand-100),
-    3px 0 0 2px var(--color-brand-100);
+    -2px 0 0 0 var(--color-brand-100),
+    4px 0 0 0 var(--color-brand-100);
 }
 
 .word-active + .word-active {
@@ -180,14 +186,18 @@
   border-bottom-left-radius: 0;
 }
 
-/* The sentence being narrated, drawn under the whole sentence including its
-   spaces. Kept to a thin light-blue rule: it has to be findable at a glance
-   without competing with the word highlight sitting inside it. */
-::highlight(read-along-sentence) {
-  text-decoration-line: underline;
-  text-decoration-color: var(--color-brand-300);
-  text-decoration-thickness: 2px;
-  text-underline-offset: 4px;
+/* The sentence being narrated: the brand accent at 35%, drawn as a thin rule
+   under each line the sentence covers. It is an element rather than a text
+   decoration because every decoration route comes out dashed -- a class on
+   the words leaves the spaces bare, and a highlight range is painted per
+   element, so a sentence split into word spans breaks at every span. */
+.sentence-rule {
+  position: absolute;
+  height: 2px;
+  border-radius: 1px;
+  background: color-mix(in oklab, var(--color-brand-600) 35%, transparent);
+  pointer-events: none;
+  z-index: 0;
 }
 
 /* Words are only clickable while this page's narration is playing, so the
