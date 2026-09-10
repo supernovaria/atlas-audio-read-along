@@ -52,7 +52,7 @@ Same source + fresh tooling should always produce the same artifacts. This is as
 
 **Where it does NOT hold (and why):** `loadChapter(X)` called twice on the _same_ loader produces different hashes because the `Transformer` accumulates per-textbook counters (figure numbers etc.) as instance state. This is intentional — "Figure 3.2" requires global context — and documented in [`ARCHITECTURE.md`](./ARCHITECTURE.md) under "Content pipeline / Transformer".
 
-Rendered pages also depend on what audio the building machine can reach: the audio renderer only keeps a section's `audioLink` if the MP3 was pulled from R2, and `resolveSectionAudio` prefers locally staged chapter 1 files over the published ones. Two builds of the same commit can therefore emit different `data-audio-url` values. That is deliberate — the alternative is a page pointing at a file the build cannot serve — and it doesn't reach the content hash, which is computed from the source document alone (`loader.ts:164`).
+Rendered pages also depend on what audio the building machine can reach: the audio renderer only keeps a section's `audioLink` if the MP3 was pulled from R2, and `resolveSectionAudio` prefers locally staged files (for chapters with committed timings) over the published ones. Two builds of the same commit can therefore emit different `data-audio-url` values. That is deliberate — the alternative is a page pointing at a file the build cannot serve — and it doesn't reach the content hash, which is computed from the source document alone (`loader.ts:164`).
 
 ## 5. Observability — one banner, no spelunking
 

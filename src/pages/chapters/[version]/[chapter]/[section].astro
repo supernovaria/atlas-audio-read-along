@@ -56,7 +56,7 @@ const audioSources = import.meta.env.DEV
     : null;
 const audioSourceOptions = audioSources ? [
     { value: 'auto', available: true, hint: 'Whatever this build can serve, preferring the staged constant-bitrate file.' },
-    { value: 'cbr', available: audioSources.cbr, hint: 'The locally staged constant-bitrate file. Seeking lands exactly on the word, so this is the source to prefer. Stage it with scripts/copy-ch1-audio.sh.' },
+    { value: 'cbr', available: audioSources.cbr, hint: 'The locally staged constant-bitrate file. Seeking lands exactly on the word, so this is the source to prefer. Stage it with scripts/copy-chapter-audio.sh.' },
     { value: 'cdn', available: audioSources.cdn, hint: 'The published file. Same narration, so the read-along still tracks, but it is variable bitrate and a seek only lands nearby.' },
     { value: 'none', available: true, hint: 'Pretend the section has no audio, to check the page degrades to the no-player state.' },
 ] : [];

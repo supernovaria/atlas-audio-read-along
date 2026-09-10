@@ -28,7 +28,7 @@ pnpm dev --host 0.0.0.0
 | Inline equations, footnotes, callouts | ✓                 | All rendered from the cache              |
 | Figures                               | Caption only      | Image assets are not committed           |
 | PDF / audio                           | Skipped           | Maintainer-only, gated by `BuildMode`    |
-| Chapter 1 narration + read-along      | ✓                 | Streams the published audio (see below)  |
+| Narration + read-along (chapters 1-8) | ✓                 | Streams the published audio (see below)  |
 
 The build prints which mode it resolved at startup:
 
@@ -36,24 +36,24 @@ The build prints which mode it resolved at startup:
 [atlas] BuildMode: contributor, cache-only, no PDF, no audio, no R2 audio pull, no Algolia indexing, search enabled
 ```
 
-### Chapter 1 read-along audio
+### Read-along audio
 
-Chapter 1 ships word-level timings (`public/audio/ch1/*.words.json`) so the narration can highlight the text as it plays. The MP3s are not committed -- they are large and reproducible -- so a page plays whichever source the build has:
+Every chapter ships word-level timings (`public/audio/ch{N}/*.words.json`) so the narration can highlight the text as it plays. The MP3s are not committed -- they are large and reproducible -- so a page plays whichever source the build has:
 
-| Source | Where it comes from                                                        | Seeking |
-| ------ | -------------------------------------------------------------------------- | ------- |
-| `cbr`  | Staged locally by `scripts/copy-ch1-audio.sh`. Preferred.                   | Exact -- constant bitrate |
-| `cdn`  | The published file: `section.audioLink` in a build with credentials, otherwise the URL pinned in `src/data/ch1-timing.ts`. | Approximate -- the published file is variable bitrate, and browsers interpolate |
+| Source | Where it comes from                                                            | Seeking |
+| ------ | ------------------------------------------------------------------------------- | ------- |
+| `cbr`  | Staged locally by `scripts/copy-chapter-audio.sh`. Preferred.                    | Exact -- constant bitrate |
+| `cdn`  | The published file: `section.audioLink` in a build with credentials, otherwise the URL pinned in `src/data/chapter-timing.ts`. | Approximate -- the published file is variable bitrate, and browsers interpolate |
 
 So a plain clone still gets the read-along, streamed from the published audio; staging the local files is only needed for exact seeking, which is what work on click-a-word-to-seek wants. Sections with neither source render no player at all.
 
-To stage them:
+To stage a chapter:
 
 ```bash
-scripts/copy-ch1-audio.sh --fetch
+scripts/copy-chapter-audio.sh --fetch 4
 ```
 
-That downloads the published audio and re-encodes it, and needs only `curl` and `ffmpeg`. All 11 sections are ~107 MB and take about a minute; name the ones you want to skip the wait -- `scripts/copy-ch1-audio.sh --fetch 1` stages section 1.1 in a couple of seconds, which is enough to compare seeking between the two sources. Without `--fetch` the script copies from the podcast pipeline's `output/capabilities` directory instead, if you have one -- point it elsewhere with `ATLAS_AUDIO_SRC`. Both routes produce the same audio.
+That downloads the published audio and re-encodes it, and needs only `curl` and `ffmpeg`. A chapter's sections run tens of MB each; name the ones you want to skip the wait -- `scripts/copy-chapter-audio.sh --fetch 4 1` stages section 4.1 in a couple of seconds, which is enough to compare seeking between the two sources. Without `--fetch` the script copies from the podcast pipeline's `output/<chapter-slug>` directory instead, if you have one -- point it elsewhere with `ATLAS_AUDIO_SRC`. Both routes produce the same audio.
 
 `pnpm dev` adds a small switch above the player (`source: cbr | auto cbr cdn none`) that forces a source and reloads, including `none` for checking that the page degrades without a player. It exists only in dev builds.
 

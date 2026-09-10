@@ -42,17 +42,17 @@ describe("resolveSectionAudio", () => {
     expect(audio?.wordsUrl).toBe("/audio/ch1/ch1-s1.words.json")
   })
 
-  // Outside chapter 1 nothing is pinned, so a build that resolved no audio
+  // A chapter with no timing table at all -- a build that resolved no audio
   // must report none. Returning a player that loads a 404 would be worse than
   // the no-player state the rest of the site already shows.
   it("reports no audio when neither source exists", () => {
-    expect(resolveSectionAudio(4, 2, undefined, { staged: notStaged })).toBeNull()
+    expect(resolveSectionAudio(99, 2, undefined, { staged: notStaged })).toBeNull()
   })
 
-  // Only chapter 1 has timings. Every other section must still play its
-  // published audio, just without a read-along.
+  // A section outside every timed chapter must still play its published
+  // audio, just without a read-along.
   it("plays published audio without timings for chapters that have none", () => {
-    expect(resolveSectionAudio(4, 2, CDN, { staged: notStaged })).toEqual({
+    expect(resolveSectionAudio(99, 2, CDN, { staged: notStaged })).toEqual({
       audioUrl: CDN,
       wordsUrl: null,
       source: "cdn",
@@ -77,7 +77,7 @@ describe("resolveSectionAudio", () => {
   // than quietly falling back, or the switch would lie about what is playing.
   it("reports no audio when the forced source is unavailable", () => {
     expect(resolveSectionAudio(1, 1, CDN, { staged: notStaged, override: "cbr" })).toBeNull()
-    expect(resolveSectionAudio(4, 2, undefined, { staged, override: "cdn" })).toBeNull()
+    expect(resolveSectionAudio(99, 2, undefined, { staged, override: "cdn" })).toBeNull()
   })
 
   // "none" is how the no-player path gets exercised on a machine that has the
@@ -110,8 +110,8 @@ describe("availableAudioSources", () => {
       cbr: false,
       cdn: true,
     })
-    expect(availableAudioSources(4, 2, CDN, { staged })).toEqual({ cbr: false, cdn: true })
-    expect(availableAudioSources(4, 2, undefined, { staged })).toEqual({
+    expect(availableAudioSources(99, 2, CDN, { staged })).toEqual({ cbr: false, cdn: true })
+    expect(availableAudioSources(99, 2, undefined, { staged })).toEqual({
       cbr: false,
       cdn: false,
     })

@@ -1,20 +1,21 @@
 /**
  * Which audio file a section page plays, and whether it can be read along.
  *
- * Chapter 1 ships word-level timings (`src/data/ch1-timing.ts`) next to CBR
- * re-encoded MP3s. Those MP3s are gitignored -- large and reproducible -- so
- * whether they are present depends on who is building. Two sources can
- * therefore serve the same narration:
+ * Chapters with word-level timings (`src/data/chapter-timing.ts`) ship them
+ * next to CBR re-encoded MP3s. Those MP3s are gitignored -- large and
+ * reproducible -- so whether they are present depends on who is building.
+ * Two sources can therefore serve the same narration:
  *
- * - `cbr`: staged locally by `scripts/copy-ch1-audio.sh`. Constant bitrate
- *   makes a seek land exactly where the timings say, which is what clicking a
- *   word to jump there needs, so this one is preferred.
+ * - `cbr`: staged locally by `scripts/copy-chapter-audio.sh`. Constant
+ *   bitrate makes a seek land exactly where the timings say, which is what
+ *   clicking a word to jump there needs, so this one is preferred.
  * - `cdn`: the published file. A build with credentials resolves it into
- *   `section.audioLink`; for chapter 1 it is also pinned in the timing table,
- *   so a clone without credentials can still play the narration those timings
- *   were measured against. Same recording, so the read-along works either
- *   way; only seeking is coarser, because the published file is variable
- *   bitrate and browsers interpolate the seek position.
+ *   `section.audioLink`; for chapters with timings it is also pinned in the
+ *   timing table, so a clone without credentials can still play the
+ *   narration those timings were measured against. Same recording, so the
+ *   read-along works either way; only seeking is coarser, because the
+ *   published file is variable bitrate and browsers interpolate the seek
+ *   position.
  *
  * With neither, the section has no audio and the page renders no player at
  * all, which is what a contributor build without credentials already does for
@@ -28,7 +29,7 @@
 
 import { existsSync } from "node:fs"
 import { join } from "node:path"
-import ch1Timing from "@/data/ch1-timing"
+import chapterTimings from "@/data/chapter-timing"
 
 export type AudioSource = "cbr" | "cdn"
 
@@ -74,7 +75,7 @@ export function resolveSectionAudio(
 ): SectionAudio | null {
   if (override === "none") return null
 
-  const timing = chapterNumber === 1 ? ch1Timing[sectionNumber] : undefined
+  const timing = chapterTimings[chapterNumber]?.[sectionNumber]
 
   if (timing && staged(timing.audioUrl) && override !== "cdn") {
     return { audioUrl: timing.audioUrl, wordsUrl: timing.wordsUrl, source: "cbr" }
@@ -97,7 +98,7 @@ export function availableAudioSources(
   publishedAudioUrl: string | undefined,
   { staged = isStaged }: Pick<ResolveOptions, "staged"> = {},
 ): Record<AudioSource, boolean> {
-  const timing = chapterNumber === 1 ? ch1Timing[sectionNumber] : undefined
+  const timing = chapterTimings[chapterNumber]?.[sectionNumber]
   return {
     cbr: !!timing && staged(timing.audioUrl),
     cdn: !!(publishedAudioUrl ?? timing?.publishedUrl),
